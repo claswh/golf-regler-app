@@ -3,36 +3,55 @@ name: Deploy Golf Regel App
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    
     steps:
-    - name: Checkout repository
+    - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
+    - name: Debug - Check files and secrets
+      run: |
+        echo "=== FILES IN ROOT ==="
+        ls -la
+        echo ""
+        echo "=== TEMPLATE FILE EXISTS? ==="
+        test -f index-template.html && echo "✅ Template file found" || echo "❌ Template file missing"
+        echo ""
+        echo "=== CHECKING FOR PLACEHOLDERS ==="
+        grep -n "YOUR_.*_API_KEY" index-template.html || echo "No placeholders found in template"
+        echo ""
+        echo "=== SECRETS STATUS ==="
+        echo "Anthropic key length: ${#ANTHROPIC_API_KEY}"
+        echo "Serper key length: ${#SERPER_API_KEY}" 
+        echo "Tavily key length: ${#TAVILY_API_KEY}"
+      env:
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
+        TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
 
     - name: Create index.html with API keys
       run: |
-        # Read the template file
         cp index-template.html index.html
-        
-        # Replace API key placeholders with actual secrets
         sed -i "s/YOUR_ANTHROPIC_API_KEY/${{ secrets.ANTHROPIC_API_KEY }}/g" index.html
-        sed -i "s/YOUR_SERPER_API_KEY/${{ secrets.SERPER_API_KEY }}/g" index.html
+        sed -i "s/YOUR_SERPER_API_KEY/${{ secrets.SERPER_API_KEY }}/g" index.html  
         sed -i "s/YOUR_TAVILY_API_KEY/${{ secrets.TAVILY_API_KEY }}/g" index.html
+        echo "✅ Replacement completed"
+
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
+
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: '.'
 
     - name: Deploy to GitHub Pages
-      uses: peaceiris/actions-gh-pages@v3
-      if: github.ref == 'refs/heads/main'
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./
-        exclude_assets: '.github,index-template.html,README.md'
+      id: deployment
+      uses: actions/deploy-pages@v4
