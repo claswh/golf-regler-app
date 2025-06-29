@@ -721,7 +721,7 @@
             }
         }
 
-        function searchRules(searchTerm) {
+        async function searchRules(searchTerm) {
             const searchResults = document.getElementById('search-results');
             const searchList = document.getElementById('search-list');
             const categories = document.getElementById('categories');
@@ -735,15 +735,17 @@
             searchList.innerHTML = '';
             let results = [];
             
+            // Search local rules first
             Object.values(golfRules).forEach(category => {
                 category.rules.forEach(rule => {
                     if (rule.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
                         rule.answer.toLowerCase().includes(searchTerm.toLowerCase())) {
-                        results.push({...rule, categoryTitle: category.title});
+                        results.push({...rule, categoryTitle: category.title, isLocal: true});
                     }
                 });
             });
             
+            // Show local results
             if (results.length > 0) {
                 results.forEach(rule => {
                     const resultCard = document.createElement('div');
@@ -755,11 +757,73 @@
                     `;
                     searchList.appendChild(resultCard);
                 });
-                searchResults.classList.remove('hidden');
-                categories.classList.add('hidden');
-            } else {
-                searchResults.classList.add('hidden');
-                categories.classList.remove('hidden');
+            }
+            
+            // Add internet search option
+            const internetSearchCard = document.createElement('div');
+            internetSearchCard.className = 'card';
+            internetSearchCard.style.borderLeft = '4px solid #3b82f6';
+            internetSearchCard.onclick = () => performInternetSearch(searchTerm);
+            internetSearchCard.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <span style="color: #3b82f6; font-size: 1.25rem;">🌐</span>
+                    <div>
+                        <h3 class="question">Søk på internett: "${searchTerm}"</h3>
+                        <p style="color: #6b7280; font-size: 0.875rem;">
+                            ${results.length > 0 ? 'Søk for mer informasjon eller andre perspektiver' : 'Ikke funnet i våre regler - søk på internett'}
+                        </p>
+                    </div>
+                </div>
+            `;
+            searchList.appendChild(internetSearchCard);
+            
+            searchResults.classList.remove('hidden');
+            categories.classList.add('hidden');
+        }
+
+        function performInternetSearch(searchTerm) {
+            // Create search query with golf context
+            const golfSearchTerm = `golf regler ${searchTerm}`;
+            
+            // Show loading state
+            showRule(
+                `Søker på internett: "${searchTerm}"`,
+                'Søker etter informasjon på internett...\n\nDette kan ta noen sekunder.'
+            );
+            
+            // Perform the actual search
+            searchGolfRules(golfSearchTerm);
+        }
+
+        async function searchGolfRules(query) {
+            try {
+                // Use Claude completion to search for golf rules
+                const response = await window.claude.complete(`
+                    Du er en golf-regel ekspert. En norsk golfer spør: "${query}"
+                    
+                    Gi et klart, konsist svar på norsk som dekker:
+                    1. Det spesifikke regelspørsmålet
+                    2. Antall straff-slag (hvis relevant)
+                    3. Praktiske instruksjoner for hva spilleren skal gjøre
+                    
+                    Svar kun med relevant regel-informasjon. Vær presis og praktisk.
+                    Hvis du ikke vet svaret sikkert, si det tydelig.
+                `);
+                
+                // Display the result
+                showRule(
+                    `Internettsøk: "${query.replace('golf regler ', '')}"`,
+                    `${response}\n\n---\nKilde: AI-assistert søk (verifiser alltid med offisielle golf-regler)`
+                );
+                
+            } catch (error) {
+                // Fallback to Google search if Claude search fails
+                const googleSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(query + ' site:golf.no OR site:ngf.no OR site:r-and-a.org')}`;
+                
+                showRule(
+                    `Søk på internett: "${query.replace('golf regler ', '')}"`,
+                    `Kunne ikke søke automatisk.\n\nTrykk her for å søke på Google:\n${googleSearchUrl}\n\nAnbefalte kilder:\n• Golf.no (Norges Golfforbund)\n• NGF.no\n• R&A.org (offisielle regler)`
+                );
             }
         }
 
