@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Golf Regel Assistent</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        import React, { useState } from 'react';
+import { Search, Droplets, AlertTriangle, MapPin, Clock, HelpCircle, ArrowLeft, Calculator, Plus, Minus } from 'lucide-react';
+
+const GolfRegelApp = () => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [selectedRule, setSelectedRule] = useState(null);
+  const [showCalculator, setShowCalculator] = useState(false);
+  const [strokeCount, setStrokeCount] = useState(1);
+  const [penalties, setPenalties] = useState({
+    outOfBounds: false,
+    waterHazard: false,
+    lostBall: false,
+    unplayableBall: false,
+    provisionalBall: false,
+    twoStrokePenalty: false
+  });
+
+  const golfRules = {
+    vannhindringer: {
+      title: 'Vannhindringer',
+      icon: Droplets,
+      color: 'blue',
+      rules: [
+        {
+          question: 'Hva betyr den røde pinnen?',
+          answer: 'Røde pinner markerer laterale vannhindringer. Du har 3 valg:\n1. Spill ballen som den ligger (ingen straff)\n2. Dropp ballen bak vannhinderet med 1 straff-slag\n3. Dropp ballen på motsatt side av hinderet med 1 straff-slag'
+        },
+        {
+          question: 'Hva betyr den gule pinnen?',
+          answer: 'Gule pinner markerer vannhindringer (ikke laterale). Du har 2 valg:\n1. Spill ballen som den ligger (ingen straff)\n2. Dropp ballen bak vannhinderet på en rett linje fra hullet med 1 straff-slag'
+        },
+        {
+          question: 'Ballen min landet i vannet, hva gjør jeg?',
+          answer: 'Hvis ballen er i et vannhinder (røde/gule pinner):\n- Ta 1 straff-slag\n- Dropp ny ball bak hinderet\n- Du kan ikke røre ballen i vannet'
+        }
+      ]
+    },
+    outOfBounds: {
+      title: 'Out of Bounds',
+      icon: AlertTriangle,
+      color: 'red',
+      rules: [
+        {
+          question: 'Hva betyr out of bounds?',
+          answer: 'Out of bounds (OB) er områder utenfor banen markert med hvite pinner/linjer. Ballen regnes som OB når den helt krysser grensen.'
+        },
+        {
+          question: 'Ballen min gikk out of bounds, hva gjør jeg?',
+          answer: 'Ved out of bounds:\n1. Ta 1 straff-slag\n2. Gå tilbake til stedet du slo fra\n3. Spill ny ball derfra\n4. Dette kalles "slag og avstand"'
+        },
+        {
+          question: 'Hvor mange straff-slag får jeg for OB?',
+          answer: 'Out of bounds gir 1 straff-slag + du må spille på nytt fra forrige posisjon. Totalt mister du 2 slag (1 straff + 1 ekstra slag).'
+        }
+      ]
+    },
+    tapteBaller: {
+      title: 'Tapte Baller',
+      icon: Search,
+      color: 'orange',
+      rules: [
+        {
+          question: 'Jeg fant ikke ballen min, hva gjør jeg?',
+          answer: 'Hvis ballen ikke finnes etter 3 minutters leting:\n1. Ballen regnes som tapt\n2. Ta 1 straff-slag\n3. Spill ny ball fra der du slo sist\n4. "Slag og avstand" regel'
+        },
+        {
+          question: 'Hvor lenge kan jeg lete etter ballen?',
+          answer: 'Du har maksimalt 3 minutter til å lete etter ballen fra du begynner å lete. Tiden starter når du eller partneren din begynner å lete.'
+        },
+        {
+          question: 'Hvor mange straff-slag for tapt ball?',
+          answer: 'Tapt ball gir 1 straff-slag + du må spille på nytt fra forrige posisjon. Totalt koster det deg 2 slag.'
+        }
+      ]
+    },
+    dropping: {
+      title: 'Dropping av Ball',
+      icon: MapPin,
+      color: 'green',
+      rules: [
+        {
+          question: 'Hvordan dropper jeg ballen riktig?',
+          answer: 'Riktig dropping:\n1. Hold ballen i skulder-høyde\n2. Slipp den rett ned\n3. Ballen må lande innenfor drop-området\n4. Ikke kast eller rull ballen'
+        },
+        {
+          question: 'Hvor mange ganger kan jeg droppe ballen?',
+          answer: 'Du kan droppe ballen 2 ganger. Hvis den ruller utenfor drop-området begge ganger, plasser ballen der den traff bakken ved andre dropping.'
+        },
+        {
+          question: 'Hva er drop-området?',
+          answer: 'Drop-området er vanligvis:\n- Innenfor 2 klubblengder fra referansepunktet\n- Ikke nærmere hullet\n- I samme område (rough, fairway, etc.)'
+        }
+      ]
+    },
+    provisorisk: {
+      title: 'Provisorisk Ball',
+      icon: Clock,
+      color: 'purple',
+      rules: [
+        {
+          question: 'Når kan jeg spille provisorisk ball?',
+          answer: 'Du kan spille provisorisk ball når:\n- Ballen kan være out of bounds\n- Ballen kan være tapt (ikke i vannhinder)\n- Du må annonsere "provisorisk ball" før du slår'
+        },
+        {
+          question: 'Hva skjer med provisorisk ball?',
+          answer: 'Hvis original ball finnes: provisorisk ball løftes\nHvis original ball er tapt/OB: fortsett med provisorisk ball + 1 straff-slag'
+        }
+      ]
+    },
+    hindringer: {
+      title: 'Hindringer',
+      icon: HelpCircle,
+      color: 'gray',
+      rules: [
+        {
+          question: 'Hva er fri dropp?',
+          answer: 'Fri dropp (ingen straff) gis ved:\n- Kasual vann på banen\n- Reparasjonsarbeid\n- Menneskeskapte hindringer\n- Dyrehull'
+        },
+        {
+          question: 'Min ball ligger mot et tre, kan jeg få fri dropp?',
+          answer: 'Nei, trær er naturlige hindringer. Du kan:\n1. Spille som ballen ligger\n2. Ta "uplayable ball" med 1 straff-slag og droppe'
+        }
+      ]
+    }
+  };
+
+  const categories = Object.entries(golfRules);
+
+  const calculateScore = () => {
+    let penaltyStrokes = 0;
+    
+    if (penalties.outOfBounds) penaltyStrokes += 1;
+    if (penalties.waterHazard) penaltyStrokes += 1;
+    if (penalties.lostBall) penaltyStrokes += 1;
+    if (penalties.unplayableBall) penaltyStrokes += 1;
+    if (penalties.provisionalBall) penaltyStrokes += 1;
+    if (penalties.twoStrokePenalty) penaltyStrokes += 2;
+    
+    return strokeCount + penaltyStrokes;
+  };
+
+  const resetCalculator = () => {
+    setStrokeCount(1);
+    setPenalties({
+      outOfBounds: false,
+      waterHazard: false,
+      lostBall: false,
+      unplayableBall: false,
+      provisionalBall: false,
+      twoStrokePenalty: false
+    });
+  };
+
+  const penaltyOptions = [
+    { key: 'outOfBounds', label: 'Out of Bounds', penalty: 1, description: 'Ball utenfor banen (hvite pinner)' },
+    { key: 'waterHazard', label: 'Vannhinder', penalty: 1, description: 'Ball i vann (røde/gule pinner)' },
+    { key: 'lostBall', label: 'Tapt ball', penalty: 1, description: 'Kunne ikke finne ballen innen 3 min' },
+    { key: 'unplayableBall', label: 'Uspillbar ball', penalty: 1, description: 'Valgte å erklære ball uspillbar' },
+    { key: 'provisionalBall', label: 'Provisorisk ball brukt', penalty: 1, description: 'Måtte bruke provisorisk ball' },
+    { key: 'twoStrokePenalty', label: 'To-slag straff', penalty: 2, description: 'Ballmarkør, golfbag i veien, etc.' }
+  ];
+
+  // Filter rules based on search term
+  const getFilteredRules = () => {
+    if (!searchTerm) return [];
+    
+    const results = [];
+    categories.forEach(([key, category]) => {
+      category.rules.forEach(rule => {
+        if (rule.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            rule.answer.toLowerCase().includes(searchTerm.toLowerCase())) {
+          results.push({ ...rule, category: category.title, categoryKey: key });
+        }
+      });
+    });
+    return results;
+  };
+
+  const filteredRules = getFilteredRules();
+
+  // Score Calculator Component
+  if (showCalculator) {
+    const totalScore = calculateScore();
+    const totalPenalties = totalScore - strokeCount;
+    
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-blue-100 p-4">
+        <div className="max-w-2xl mx-auto">
+          <button 
+            onClick={() => setShowCalculator(false)}
+            className="flex items-center gap-2 text-blue-700 mb-4 hover:text-blue-900"
+          >
+            <ArrowLeft size={20} />
+            Tilbake
+          </button>
+          
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <div className="flex items-center gap-3 mb-6">
+              <Calculator className="text-blue-600" size={28} />
+              <h2 className="text-2xl font-bold text-blue-800">Score Kalkulator</h2>
+            </div>
+
+            {/* Stroke Counter */}
+            <div className="mb-6">
+              <label className="block text-lg font-semibold text-gray-700 mb-3">
+                Antall slag brukt:
+              </label>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setStrokeCount(Math.max(1, strokeCount - 1))}
+                  className="bg-blue-500 text-white p-2 rounded-lg hover:bg-blue-600"
+                >
+                  <Minus size={20} />
+                </button>
+                <span className="text-3xl font-bold text-blue-800 min-w-[60px] text-center">
+                  {strokeCount}
+                </span>
+                <button
+                  onClick={() => setStrokeCount(strokeCount + 1)}
+                  className="bg-blue-500 text-white p-2 rounded-lg hover:bg-blue-600"
+                >
+                  <Plus size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Penalty Checkboxes */}
+            <div className="mb-6">
+              <label className="block text-lg font-semibold text-gray-700 mb-3">
+                Straff-situasjoner:
+              </label>
+              <div className="space-y-3">
+                {penaltyOptions.map((option) => (
+                  <div key={option.key} className="flex items-start gap-3 p-3 rounded-lg bg-gray-50">
+                    <input
+                      type="checkbox"
+                      id={option.key}
+                      checked={penalties[option.key]}
+                      onChange={(e) => setPenalties({
+                        ...penalties,
+                        [option.key]: e.target.checked
+                      })}
+                      className="mt-1 h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                    <div className="flex-1">
+                      <label htmlFor={option.key} className="font-medium text-gray-800 cursor-pointer">
+                        {option.label} (+{option.penalty} slag)
+                      </label>
+                      <p className="text-sm text-gray-600 mt-1">{option.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Score Summary */}
+            <div className="bg-blue-50 rounded-lg p-4 mb-4">
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-medium text-gray-700">Slag brukt:</span>
+                <span className="text-lg font-bold text-blue-800">{strokeCount}</span>
+              </div>
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-medium text-gray-700">Straff-slag:</span>
+                <span className="text-lg font-bold text-red-600">+{totalPenalties}</span>
+              </div>
+              <hr className="my-3 border-blue-200" />
+              <div className="flex justify-between items-center">
+                <span className="text-xl font-bold text-gray-800">Total score:</span>
+                <span className="text-2xl font-bold text-blue-800">{totalScore}</span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={resetCalculator}
+                className="flex-1 bg-gray-500 text-white py-3 px-4 rounded-lg hover:bg-gray-600 font-medium"
+              >
+                Nullstill
+              </button>
+              <button
+                onClick={() => {
+                  alert(`Hull ferdig! Score: ${totalScore} slag\n(${strokeCount} slag + ${totalPenalties} straff)`);
+                  resetCalculator();
+                }}
+                className="flex-1 bg-green-500 text-white py-3 px-4 rounded-lg hover:bg-green-600 font-medium"
+              >
+                Fullfør hull
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (selectedRule) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-green-50 to-green-100 p-4">
+        <div className="max-w-2xl mx-auto">
+          <button 
+            onClick={() => setSelectedRule(null)}
+            className="flex items-center gap-2 text-green-700 mb-4 hover:text-green-900"
+          >
+            <ArrowLeft size={20} />
+            Tilbake
+          </button>
+          
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <h2 className="text-xl font-bold text-green-800 mb-4">
+              {selectedRule.question}
+            </h2>
+            <div className="text-gray-700 whitespace-pre-line leading-relaxed">
+              {selectedRule.answer}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (selectedCategory) {
+    const category = golfRules[selectedCategory];
+    const IconComponent = category.icon;
+    
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-green-50 to-green-100 p-4">
+        <div className="max-w-2xl mx-auto">
+          <button 
+            onClick={() => setSelectedCategory(null)}
+            className="flex items-center gap-2 text-green-700 mb-4 hover:text-green-900"
+          >
+            <ArrowLeft size={20} />
+            Tilbake
+          </button>
+          
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <div className="flex items-center gap-3 mb-4">
+              <IconComponent className={`text-${category.color}-600`} size={28} />
+              <h2 className="text-2xl font-bold text-green-800">{category.title}</h2>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {category.rules.map((rule, index) => (
+              <div 
+                key={index}
+                onClick={() => setSelectedRule(rule)}
+                className="bg-white rounded-lg shadow-md p-4 cursor-pointer hover:shadow-lg transition-shadow"
+              >
+                <h3 className="font-semibold text-green-800 mb-2">{rule.question}</h3>
+                <p className="text-gray-600 text-sm">Trykk for fullstendig svar</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-green-50 to-green-100 p-4">
+      <div className="max-w-2xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-green-800 mb-2">⛳ Golf Regel Assistent</h1>
+          <p className="text-green-600">Få raske svar på golf-regler mens du spiller</p>
+          
+          {/* Navigation buttons */}
+          <div className="flex gap-3 justify-center mt-4">
+            <button
+              onClick={() => setShowCalculator(true)}
+              className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              <Calculator size={18} />
+              Score Kalkulator
+            </button>
+          </div>
+        </div>
+
+        {/* Search */}
+        <div className="relative mb-8">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+          <input
+            type="text"
+            placeholder="Søk etter regel eller situasjon..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-green-500 focus:border-transparent text-lg"
+          />
+        </div>
+
+        {/* Search Results */}
+        {searchTerm && filteredRules.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-green-800 mb-4">Søkeresultater</h2>
+            <div className="space-y-3">
+              {filteredRules.map((rule, index) => (
+                <div 
+                  key={index}
+                  onClick={() => setSelectedRule(rule)}
+                  className="bg-white rounded-lg shadow-md p-4 cursor-pointer hover:shadow-lg transition-shadow"
+                >
+                  <h3 className="font-semibold text-green-800 mb-1">{rule.question}</h3>
+                  <p className="text-sm text-gray-500">{rule.category}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Categories */}
+        {!searchTerm && (
+          <>
+            <h2 className="text-xl font-semibold text-green-800 mb-6">Regel-kategorier</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {categories.map(([key, category]) => {
+                const IconComponent = category.icon;
+                return (
+                  <div
+                    key={key}
+                    onClick={() => setSelectedCategory(key)}
+                    className="bg-white rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg transition-shadow"
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <IconComponent className={`text-${category.color}-600`} size={24} />
+                      <h3 className="font-semibold text-green-800">{category.title}</h3>
+                    </div>
+                    <p className="text-gray-600 text-sm">
+                      {category.rules.length} regel{category.rules.length !== 1 ? 'r' : ''}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {/* Quick access buttons */}
+        <div className="mt-8 bg-white rounded-lg shadow-md p-6">
+          <h3 className="font-semibold text-green-800 mb-4">Mest vanlige spørsmål</h3>
+          <div className="space-y-2">
+            {[
+              { q: 'Hva betyr den røde pinnen?', cat: 'vannhindringer' },
+              { q: 'Ballen min gikk out of bounds, hva gjør jeg?', cat: 'outOfBounds' },
+              { q: 'Jeg fant ikke ballen min, hva gjør jeg?', cat: 'tapteBaller' }
+            ].map((item, index) => (
+              <button
+                key={index}
+                onClick={() => {
+                  const rule = golfRules[item.cat].rules.find(r => r.question === item.q);
+                  setSelectedRule(rule);
+                }}
+                className="w-full text-left p-3 rounded-lg bg-green-50 hover:bg-green-100 text-green-800 transition-colors"
+              >
+                {item.q}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default GolfRegelApp;
+    </script>
+</body>
+</html>
