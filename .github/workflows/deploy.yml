@@ -9,11 +9,6 @@ permissions:
   pages: write
   id-token: write
 
-# Legg til environment for GitHub Pages
-environment:
-  name: github-pages
-  url: ${{ steps.deployment.outputs.page_url }}
-
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
